@@ -1,0 +1,19 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; media-src 'self' blob: data:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://*.supabase.co; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cross-Origin-Resource-Policy: same-origin
+  X-Frame-Options: DENY
+  Cache-Control: no-cache, max-age=0, must-revalidate
+/config.js
+  Cache-Control: no-store
+/auth.js
+  Cache-Control: no-store
+/admin.js
+  Cache-Control: no-store
+/focus.html
+  Cache-Control: no-store
+/index.html
+  Cache-Control: no-store
+/sw.js
+  Cache-Control: no-cache, max-age=0, must-revalidate
