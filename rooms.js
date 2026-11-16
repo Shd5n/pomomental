@@ -1,9 +1,10 @@
 ﻿import { createCompanion } from './companion.js';
 import { config } from './config.js';
+import { roomPhase } from './room-time.js';
 
 export function renderRooms(container, ctx) {
   const {t,esc,api,toast}=ctx;
-  let destroyed=false,roomData=null,busy=false,pollId=null,clockId=null,receivedAt=0,avatars=[],lastPhase='';
+  let schedulingAvailable=false,destroyed=false,roomData=null,busy=false,pollId=null,clockId=null,receivedAt=0,avatars=[],lastPhase='';
   const tr=(ar,en)=>t?t(ar,en):ctx.lang==='en'?en:ar;
   const e=esc||((v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
   const q=(s)=>container.querySelector(s);
@@ -46,8 +47,9 @@ export function renderRooms(container, ctx) {
       <section class="panel panel-pad"><div class="panel-head"><h2>${tr('ابدأ غرفة مذاكرة','Start a study room')}</h2><span class="pill">${tr('جلسة مشتركة','Shared focus')}</span></div>
         <form data-create style="margin-top:22px"><label class="field"><span>${tr('وش الموضوع اللي تدرسون عنه؟','What are you studying?')}</span><input name="subject" required maxlength="100" placeholder="${tr('مثال: IELTS أو القدرات','e.g. IELTS or calculus')}" autocomplete="off"></label>
         <div class="field-row"><label class="field"><span>${tr('التركيز · دقيقة','Focus · minutes')}</span><input name="focus" type="${ctx.lang==='ar'?'text':'number'}" min="1" max="240" value="${localizeDigits(25)}" required inputmode="numeric"></label><label class="field"><span>${tr('البريك · دقيقة','Break · minutes')}</span><input name="break" type="${ctx.lang==='ar'?'text':'number'}" min="1" max="60" value="${localizeDigits(5)}" required inputmode="numeric"></label></div>
-        <button class="primary" type="submit" style="width:100%">${tr('إنشاء الغرفة والبدء','Create room & start')}</button></form>
-        <p class="limit-notice">${tr('تبدأ الساعة عند إنشاء الغرفة. تُحسب لكل عضو دقائق التركيز منذ انضمامه، دون وقت البريك.','The timer starts when you create the room. Members earn focus time from the moment they join, excluding breaks.')}</p>
+        <div class="field-row"><label class="field"><span>${tr('نبدأ بعد · دقيقة','Start in · minutes')}</span><input name="wait" type="${ctx.lang==='ar'?'text':'number'}" min="1" max="60" value="${localizeDigits(5)}" required inputmode="numeric"></label><label class="field"><span>${tr('عدد الجولات','Focus rounds')}</span><input name="cycles" type="${ctx.lang==='ar'?'text':'number'}" min="1" max="12" value="${localizeDigits(4)}" required inputmode="numeric"></label></div>
+        <p class="room-schedule-preview" data-schedule-preview></p><button class="primary" type="submit" style="width:100%">${tr('إنشاء غرفة الانتظار','Create waiting room')}</button></form>
+        <p class="limit-notice">${tr('أنت تحدد مهلة الانتظار للجميع. تبدأ المذاكرة تلقائيًا عند انتهاء العدّاد، ووقت الانتظار لا يُحسب.','You choose the countdown for everyone. Focus starts automatically when it ends. Waiting and breaks never count as study time.')}</p>
       </section>
       <section class="panel panel-pad"><h2>${tr('عندك دعوة؟','Have an invitation?')}</h2><p class="muted" style="margin:12px 0 24px;line-height:1.9">${tr('أدخل رمز الغرفة وانضم لنفس الموضوع والعداد مع رفاقك.','Enter a room code to join your friends’ topic and synchronized timer.')}</p>
         <form data-join><label class="field"><span>${tr('رمز الغرفة','Room code')}</span><input name="code" required pattern="[A-Za-z2-9]{8}" maxlength="8" value="${e(invite)}" placeholder="ABCD2345" autocomplete="off" autocapitalize="characters" spellcheck="false" dir="ltr" style="letter-spacing:4px;text-transform:uppercase"></label><button type="submit" style="width:100%">${tr('انضم للمذاكرة','Join study room')}</button></form>
@@ -55,9 +57,11 @@ export function renderRooms(container, ctx) {
       </section>
       <p class="note full">${tr('أرسل الرمز لأصدقائك بعد تسجيل دخولهم. كل شخص يحتفظ بساعاته، والدردشة تفتح وقت البريك فقط.','Share the code with friends after they sign in. Everyone keeps their own hours, and chat opens during breaks.')}</p>
     </div>`;
+    const preview=()=>{const data=new FormData(q('[data-create]')),f=parseDigits(data.get('focus')),b=parseDigits(data.get('break')),w=parseDigits(data.get('wait')),c=parseDigits(data.get('cycles'));q('[data-schedule-preview]').textContent=tr('انتظار ','Wait ')+localizeDigits(w)+tr(' د · المذاكرة والبريك: ',' min · Focus and breaks: ')+localizeDigits(c*f+(c-1)*b)+tr(' دقيقة',' min');};
+    q('[data-create]').addEventListener('input',preview);preview();
     q('[data-create]').addEventListener('submit',event=>{
       event.preventDefault();const form=event.currentTarget,data=new FormData(form);
-      action(form.querySelector('button'),async()=>{const focusMinutes=parseDigits(data.get('focus')),breakMinutes=parseDigits(data.get('break'));if(!Number.isFinite(focusMinutes)||!Number.isFinite(breakMinutes)){throw Error(tr('أدخل مدة صحيحة للتركيز والبريك.','Enter valid focus and break durations.'));}const value=await api('/rooms',{subject:data.get('subject'),focusMinutes,breakMinutes});enter(value);notifyProgress();});
+      action(form.querySelector('button'),async()=>{const focusMinutes=parseDigits(data.get('focus')),breakMinutes=parseDigits(data.get('break')),waitMinutes=parseDigits(data.get('wait')),cycles=parseDigits(data.get('cycles'));if(![focusMinutes,breakMinutes,waitMinutes,cycles].every(Number.isInteger)||focusMinutes<1||focusMinutes>240||breakMinutes<1||breakMinutes>60||waitMinutes<1||waitMinutes>60||cycles<1||cycles>12)throw Error(tr('تحقق من مدة التركيز والانتظار وعدد الجولات.','Check your focus time, countdown, and rounds.'));if(!schedulingAvailable)throw Error(tr('غرف الانتظار قيد التحديث. جرّب لاحقًا.','Waiting rooms are being updated. Please try again shortly.'));const value=await api('/rooms',{subject:data.get('subject'),focusMinutes,breakMinutes,waitMinutes,cycles});enter(value);notifyProgress();});
     });
     q('[data-join]').addEventListener('submit',event=>{
       event.preventDefault();const form=event.currentTarget,data=new FormData(form);
@@ -66,17 +70,16 @@ export function renderRooms(container, ctx) {
   }
   function calculatePhase() {
     if(!roomData)return null;
-    const now=roomData.serverTime+(Date.now()-receivedAt);
-    const focus=roomData.room.focus_minutes*60,rest=roomData.room.break_minutes*60,cycle=focus+rest;
-    const elapsed=Math.max(0,(now-roomData.room.started_at)/1000),offset=elapsed%cycle;
-    return {phase:offset<focus?'focus':'break',remaining:Math.ceil((offset<focus?focus:cycle)-offset),cycle:Math.floor(elapsed/cycle)+1};
+    return roomPhase(roomData.room,roomData.serverTime+(Date.now()-receivedAt));
   }
   function tick() {
     if(destroyed||!roomData)return;
     const phase=calculatePhase(),isBreak=phase.phase==='break';
     const clock=q('[data-clock]');if(clock)clock.textContent=duration(phase.remaining);
-    const badge=q('[data-phase]');if(badge)badge.textContent=isBreak?tr('وقت البريك','Break time'):tr('وقت التركيز','Focus time');
-    const cycle=q('[data-cycle]');if(cycle)cycle.textContent=`${tr('الجولة','Round')} ${localizeDigits(phase.cycle)}`;
+    const badge=q('[data-phase]');if(badge)badge.textContent=phase.phase==='waiting'?tr('نبدأ بعد','Starting in'):phase.phase==='complete'?tr('اكتملت الجلسة','Session complete'):isBreak?tr('وقت البريك','Break time'):tr('وقت التركيز','Focus time');
+    const hint=q('[data-phase-hint]');if(hint)hint.textContent=phase.phase==='waiting'?tr('جهّز كتبك وماءك. نبدأ كلنا مع نهاية العدّاد.','Get your notes and water ready. Everyone starts when the countdown ends.'):phase.phase==='complete'?tr('يعطيكم العافية. تم حفظ وقت التركيز.','Good work. Your focus time has been saved.'):isBreak?tr('قم من مكانك وخذ استراحة قصيرة.','Get up and take a short break.'):tr('موضوع واحد. انتباهك هنا.','One topic. Your attention, here.');
+    q('[data-room-timer]')?.setAttribute('data-mode',phase.phase);
+    const cycle=q('[data-cycle]');if(cycle)cycle.textContent=phase.phase==='waiting'?tr('غرفة الانتظار','Waiting room'):`${tr('الجولة','Round')} ${localizeDigits(phase.cycle)} / ${localizeDigits(roomData.room.planned_cycles||4)}`;
     const chat=q('[data-chat-text]'),send=q('[data-send]');
     if(chat)chat.disabled=!isBreak;if(send)send.disabled=!isBreak||busy;
     const locked=q('[data-chat-locked]');if(locked){locked.hidden=isBreak;locked.style.display=isBreak?'none':'grid';}
@@ -99,14 +102,15 @@ export function renderRooms(container, ctx) {
     if(atBottom)messages.scrollTop=messages.scrollHeight;
     tick();
   }
+  function formatMoment(ms){return new Date(Number(ms)).toLocaleString(ctx.lang==='ar'?'ar-SA':'en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',calendar:'gregory'});}
   function enter(value) {
     if(destroyed)return;
     roomData=value;receivedAt=Date.now();lastPhase='';stopIntervals();cleanupAvatars();
     container.innerHTML=`<div class="page-heading"><div class="eyebrow">YOUR FOCUS CIRCLE</div><h1>${e(value.room.subject)}</h1><p>${tr('العداد متزامن مع الجميع. الوقت يُحفظ تلقائيًا باسم هذا الموضوع.','Everyone shares one timer. Your focus time saves automatically under this topic.')}</p></div>
       <div class="note" data-error role="status" hidden></div>
       <div class="page-grid" style="margin-top:18px">
-        <section class="panel panel-pad" style="text-align:center"><div class="panel-head"><span class="pill" data-phase></span><small data-cycle></small></div>
-          <div class="room-clock" data-clock aria-live="off">--:--</div><p class="muted" style="font-size:12px">${tr('دقيقة واحدة، خطوة أقرب.','One minute. One step closer.')}</p>
+        <section class="panel panel-pad room-timer-panel" data-room-timer style="text-align:center"><div class="panel-head"><span class="pill" data-phase></span><small data-cycle></small></div>
+          <div class="room-clock" data-clock aria-live="off">--:--</div><p class="room-phase-hint muted" data-phase-hint></p><div class="room-schedule"><span>${tr('البداية','Starts')}<strong>${formatMoment(value.room.started_at)}</strong></span><span>${tr('النهاية','Ends')}<strong>${value.room.ends_at?formatMoment(value.room.ends_at):'—'}</strong></span></div>
           <div class="break-notice" data-break-notice hidden><strong>${tr('ممنوع مسك الجوال','No phone scrolling')}</strong><br>${tr('قوم وتمدد، اشرب ماء، وأرح عينيك بعيدًا عن الشاشة.','Stand up, stretch, drink water, and look away from the screen.')}</div>
           <div style="border-top:1px solid var(--line);margin-top:24px;padding-top:20px"><small>${tr('رمز الدعوة','Invitation code')}</small><div class="room-code" style="margin:10px 0">${e(value.code)}</div><button data-copy class="quiet-button">${tr('نسخ دعوة: تعال ذاكر معي','Copy study invitation')}</button><button data-copy-code class="quiet-button">${tr('نسخ الرمز','Copy code')}</button></div>
           <p class="limit-notice">${tr('يحتاج أصدقاؤك حسابًا في التطبيق للانضمام.','Your friends need an app account to join.')}</p>
@@ -120,10 +124,8 @@ export function renderRooms(container, ctx) {
         <section class="panel panel-pad full"><div class="panel-head"><h2>${tr('رفاق الغرفة','People in this room')}</h2><span class="pill" data-member-count></span></div><div data-members style="margin-top:10px"></div><p class="limit-notice">${tr('يُحتسب وقت التركيز أثناء بقائك متصلًا بالغرفة. عند انقطاع الاتصال، تُستبعد الفجوات الطويلة لحماية دقة الإحصائيات.','Focus counts while you stay connected to the room. Long offline gaps are excluded to keep study records accurate.')}</p></section>
       </div>`;
     q('[data-copy]').addEventListener('click',()=>action(q('[data-copy]'),async()=>{
-      const link=config.publicSiteUrl?new URL('./focus.html',config.publicSiteUrl):new URL('./focus.html',location.href);link.searchParams.set('room',roomData.code);
-      const startValue=Number(roomData.room.started_at)||Date.parse(roomData.room.started_at),startedAt=new Date(startValue),focusEndsAt=new Date(startedAt.getTime()+Number(roomData.room.focus_minutes)*60000);
-      const formatTime=value=>value.toLocaleTimeString(ctx.lang==='ar'?'ar-SA':'en-GB',{hour:'2-digit',minute:'2-digit'});
-      const invitation=tr('تعال ذاكر معي في PomoMental 📚','Come study with me on PomoMental 📚')+'\n'+tr('موضوعنا: ','Our topic: ')+roomData.room.subject+'\n'+tr('تبدأ الجلسة: ','Session starts: ')+formatTime(startedAt)+'\n'+tr('ينتهي التركيز الأول: ','First focus block ends: ')+formatTime(focusEndsAt)+'\n'+tr('تركيز: ','Focus: ')+localizeDigits(roomData.room.focus_minutes)+tr(' دقيقة',' minutes')+' · '+tr('بريك: ','Break: ')+localizeDigits(roomData.room.break_minutes)+tr(' دقيقة',' minutes')+'\n'+link.href;await copyText(invitation);notify(tr('نسخنا الدعوة بالرابط والموضوع والوقت. أرسلها لرفيقك 📚','Invitation copied with the link, topic, and time. Share it with your study buddy 📚'));
+      const link=new URL('focus.html',config.publicSiteUrl||new URL('./',location.href).href);link.searchParams.set('room',roomData.code);
+      const invitation=tr('تعال ذاكر معي في PomoMental','Come study with me on PomoMental')+'\n'+tr('موضوعنا: ','Our topic: ')+roomData.room.subject+'\n'+tr('البداية: ','Starts: ')+formatMoment(roomData.room.started_at)+'\n'+tr('النهاية: ','Ends: ')+(roomData.room.ends_at?formatMoment(roomData.room.ends_at):tr('يحددها القائد','Set by the leader'))+'\n'+tr('الجولات: ','Rounds: ')+localizeDigits(roomData.room.planned_cycles||4)+' · '+tr('تركيز: ','Focus: ')+localizeDigits(roomData.room.focus_minutes)+tr(' د',' min')+' · '+tr('بريك: ','Break: ')+localizeDigits(roomData.room.break_minutes)+tr(' د',' min')+'\n'+tr('الأوقات حسب: ','Timezone: ')+Intl.DateTimeFormat().resolvedOptions().timeZone+'\n'+link.href;await copyText(invitation);notify(tr('نسخنا الدعوة بالموضوع وموعد البداية والنهاية.','Invitation copied with the topic, start, and finish time.'));
     }));
     q('[data-copy-code]').addEventListener('click',()=>action(q('[data-copy-code]'),async()=>{await copyText(roomData.code);notify(tr('تم نسخ رمز الغرفة','Room code copied'));}));
     q('[data-leave]').addEventListener('click',()=>action(q('[data-leave]'),async()=>{await api(`/rooms/${roomData.code}/leave`,{});lobby();notifyProgress();notify(tr('تم حفظ وقت المذاكرة','Study time saved'));}));
@@ -150,7 +152,7 @@ export function renderRooms(container, ctx) {
   async function initialize(){
     container.innerHTML=`<div class="loading">${tr('نجهز مساحة المذاكرة…','Preparing your study space…')}</div>`;
     try{
-      const state=await api('/state');if(destroyed)return;
+      const state=await api('/state');if(destroyed)return;schedulingAvailable=state.capabilities?.roomScheduling===true;
       if(state.rooms?.length){enter(await api(`/rooms/${state.rooms[0].code}`));poll();}else lobby();
     }catch(error){lobby();showError(error);}
   }
