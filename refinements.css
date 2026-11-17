@@ -30,3 +30,25 @@ html[lang=en] h2{line-height:1.4}
 @media(min-width:621px) and (max-width:1050px){.workspace-grid,.bottom-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.timer-top{justify-content:center}.timer-disc .time{font-size:58px}.timer-state{font-size:11px}.sound-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.main{padding-inline:14px}.topbar{flex-wrap:wrap;row-gap:12px}.top-actions{margin-inline-start:auto}.mobile-brand{font-size:15px}.mobile-brand img{width:28px;height:28px}.nav button{font-size:10px;line-height:1.4}.nav button span{max-width:100%;white-space:normal}.timer-disc .time{font-size:64px}.timer-state{font-size:12px}.hello h1{font-size:27px}.hello p,.page-heading p{font-size:14px}.panel-pad,.rankings{padding:19px}.speech{font-size:15px}.welcome-card{padding:24px 20px}.ranking-mark{display:none}.ranking-featured{grid-template-columns:1fr}.rank-card{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:16px}.rank-card-top{grid-column:1/-1;margin-bottom:10px}.rank-avatar{grid-row:2/4;margin:0}.rank-card h3{grid-column:2;font-size:14px}.rank-school{grid-column:2;grid-row:3;font-size:11px;min-height:0;margin:0}.rank-time{grid-column:3;grid-row:2;font-size:18px}.rank-caption{grid-column:3;grid-row:3;text-align:end}.rank-row{grid-template-columns:22px minmax(0,1fr) 84px;gap:9px}.rank-duration strong{font-size:12px}.rank-person>strong{font-size:13px}.rank-university{font-size:11px}.ranking-toolbar{margin-bottom:20px}.room-schedule{gap:8px}.room-schedule>span{padding:10px}.room-schedule strong{font-size:12px}}
 @media(max-width:360px){.timer-top{justify-content:center}.mobile-brand{font-size:13px}.top-actions button{padding-inline:7px;font-size:12px}.rank-time{font-size:15px}.ranking-featured .rank-card{gap:4px 8px}.rank-card h3{font-size:13px}}
+/* Personal room controls and still companion portraits. */
+.room-avatar{width:48px;height:58px;flex:0 0 48px;overflow:hidden;border-radius:14px;background:#17273a}
+.room-avatar svg{display:block;width:100%;height:100%;pointer-events:none}
+.message .room-avatar{width:36px;height:44px;flex-basis:36px;border-radius:11px}
+.participant>div:nth-child(2),.message .body{min-width:0;overflow-wrap:anywhere}
+.participant small{margin-inline-start:auto;white-space:nowrap}
+.chat .messages{min-height:220px;max-height:390px;overflow-y:auto;overflow-anchor:auto}
+.room-sounds-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}
+.room-sound{min-width:0;background:#0c1522;border:1px solid var(--line);border-radius:15px;padding:12px}
+.room-sound button{display:flex;align-items:center;gap:10px;text-align:start;width:100%;min-height:56px;border:0;background:transparent;padding:4px;color:var(--muted);line-height:1.5;font-size:13px}
+.room-sound button[aria-pressed=true]{color:#a6e7ee}
+.sound-indicator{width:15px;height:15px;flex:0 0 15px;border-radius:50%;border:2px solid var(--sound-color);background:transparent}
+[aria-pressed=true]>.sound-indicator{background:var(--sound-color);box-shadow:0 0 0 4px color-mix(in srgb,var(--sound-color) 15%,transparent)}
+.room-sound input{display:block;width:100%;margin:12px 0 2px;accent-color:#78cde1}
+.sound-privacy{font-size:13px;line-height:1.8;margin-top:10px}
+.wardrobe-page .mini-badge:has(img){background:#fff!important;clip-path:none;border-radius:9px;width:44px;height:44px;display:grid;place-items:center;flex:none}
+.wardrobe-page .mini-badge img{object-fit:contain;display:block;max-width:36px;max-height:36px}
+.wardrobe-page .choice-row{display:flex;flex-wrap:wrap;gap:8px}
+.wardrobe-page .choice-row button{flex:1 1 90px}
+.wardrobe-page .choice-row button{font-size:13px;min-height:42px;padding:9px 14px}
+@media(max-width:760px){.room-sounds-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){.room-sounds-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.room-sound button{font-size:12px}.participant{gap:10px}.participant strong{font-size:13px!important}.chat-form{gap:8px}.chat-form input{min-width:0}.room-clock{font-size:clamp(46px,13vw,72px)}}
